@@ -6,7 +6,8 @@ default:
 # One-time setup
 setup:
     cargo install espup
-    espup install
+    cargo install cargo-espflash espflash
+    espup install --targets "esp32c2"
     @echo "Restart shell: exit, then nix develop"
 
 new:

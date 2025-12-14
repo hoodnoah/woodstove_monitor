@@ -1,6 +1,7 @@
 # Rust
 /target/
 Cargo.lock
+flycheck*
 
 # ESP-IDF build artifacts
 /.embuild/

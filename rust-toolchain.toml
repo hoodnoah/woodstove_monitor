@@ -1,0 +1,3 @@
+[toolchain]
+channel = "esp"           # Custom ESP toolchain installed by espup
+components = ["rust-src"]
