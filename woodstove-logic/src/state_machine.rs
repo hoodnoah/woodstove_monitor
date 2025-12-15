@@ -14,6 +14,7 @@ pub struct StoveStateMachine {
     state_set_time: Instant,
     last_update_time: Instant,
     last_temp: Option<f32>,
+    roc_alpha: f32,
     rate_of_change: Option<f32>,
     // TODO: What fields do you need?
     // - current state
@@ -23,13 +24,18 @@ pub struct StoveStateMachine {
 }
 
 impl StoveStateMachine {
-    pub fn new(/* config params? */) -> Self {
+    pub fn new() -> Self {
+        StoveStateMachine::new_roc(None)
+    }
+
+    pub fn new_roc(roc_alpha: Option<f32>) -> Self {
         let now = Instant::now();
         StoveStateMachine {
             state: BurnState::Idle, // assume idle initially
             state_set_time: now,
             last_update_time: now,
             last_temp: None,
+            roc_alpha: roc_alpha.unwrap_or(0.3),
             rate_of_change: None,
         }
     }
@@ -51,7 +57,10 @@ impl StoveStateMachine {
                         self.rate_of_change = Some(instantaneous);
                     }
                     Some(last_roc) => {
-                        self.rate_of_change = Some(last_roc + instantaneous);
+                        // calculate exponential moving average
+                        let new =
+                            self.roc_alpha * instantaneous + (1.0 - self.roc_alpha) * last_roc;
+                        self.rate_of_change = Some(new);
                     }
                 }
             }
@@ -167,5 +176,28 @@ mod tests {
             actual,
             variance,
         )
+    }
+
+    #[test]
+    fn third_update_updates_roc() {
+        let mut sm = StoveStateMachine::new();
+        sm.update(0.0);
+        sleep(Duration::from_secs(2));
+        sm.update(20.0);
+        sleep(Duration::from_secs(2));
+        sm.update(10.0);
+
+        let expected_rate = 0.3 * (10.0 / 2.0) + 0.7 * (20.0 / 2.0);
+        let actual = sm.rate_of_change.unwrap();
+        let variance = expected_rate - actual;
+
+        assert!(
+            variance < FLOAT_TOLERANCE,
+            "expected variance between expected_rate ({}) and actual rate ({}) to be less than {}, received {}.",
+            expected_rate,
+            actual,
+            FLOAT_TOLERANCE,
+            variance
+        );
     }
 }
