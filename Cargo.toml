@@ -1,9 +1,13 @@
+[workspace]
+members = [".", "woodstove-logic"]
+# resolver = "2"
+
 [package]
 name = "woodstove_monitor"
 version = "0.1.0"
 authors = ["Noah Hood <hood.noah@icloud.com>"]
 edition = "2021"
-resolver = "2"
+# resolver = "2"
 rust-version = "1.77"
 
 [[bin]]

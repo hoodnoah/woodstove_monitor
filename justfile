@@ -24,3 +24,6 @@ monitor:
 
 clean:
     cargo clean
+
+test-lib:
+    cargo test -p woodstove-logic --target aarch64-apple-darwin
