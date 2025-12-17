@@ -1,5 +1,31 @@
 use std::time::{Duration, Instant};
 
+pub struct StoveConfig {
+    pub idle_threshold: f32,
+    pub active_threshold: f32,
+    pub active_exit_threshold: f32,
+    pub overheat_threshold: f32,
+
+    // Rate thresholds
+    pub rising_fast_rate: f32,
+    pub falling_rate: f32,
+    pub stable_rate: f32,
+}
+
+impl Default for StoveConfig {
+    fn default() -> Self {
+        Self {
+            idle_threshold: 150.0,
+            active_threshold: 400.0,
+            active_exit_threshold: 350.0,
+            overheat_threshold: 700.0,
+            rising_fast_rate: 5.0 / 60.0,
+            falling_rate: -3.0 / 60.0,
+            stable_rate: 1.2 / 60.0,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BurnState {
     Idle,
@@ -9,7 +35,15 @@ pub enum BurnState {
     Overheat,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TempChangeType {
+    RisingFast,
+    Falling,
+    Stable,
+}
+
 pub struct StoveStateMachine {
+    config: StoveConfig,
     state: BurnState,
     state_set_time: Instant,
     last_update_time: Instant,
@@ -31,6 +65,7 @@ impl StoveStateMachine {
     pub fn new_roc(roc_alpha: Option<f32>) -> Self {
         let now = Instant::now();
         StoveStateMachine {
+            config: StoveConfig::default(),
             state: BurnState::Idle, // assume idle initially
             state_set_time: now,
             last_update_time: now,
@@ -41,6 +76,7 @@ impl StoveStateMachine {
     }
 
     pub fn update(&mut self, current_temp_f: f32) {
+        // Update rate of change
         let now = Instant::now();
         let last = self.last_update_time;
         self.last_update_time = now;
@@ -66,12 +102,11 @@ impl StoveStateMachine {
             }
         }
 
-        // let elapsed = now - self.last_update_time;
-        // TODO:
-        // - Calculate rate of change
-        // - Determine state transitions
-        // - Update internal state
-        // todo!()
+        // determine new state
+        let rate_type = self.classify_rate();
+        let new_state = self.classify_state(rate_type, current_temp_f);
+
+        self.state = new_state;
     }
 
     pub fn current_state(&self) -> BurnState {
@@ -86,6 +121,86 @@ impl StoveStateMachine {
         // TODO: Logic for when reload is needed
         // Based on state + temperature + time?
         todo!()
+    }
+
+    // determines if a given rate of change is rising, stable, falling
+    fn classify_rate(&self) -> TempChangeType {
+        match self.rate_of_change {
+            None => TempChangeType::Stable,
+            Some(r) => {
+                if r > self.config.rising_fast_rate {
+                    TempChangeType::RisingFast
+                } else if r < self.config.falling_rate {
+                    TempChangeType::Falling
+                } else {
+                    TempChangeType::Stable
+                }
+            }
+        }
+    }
+
+    fn classify_state(&self, roc_class: TempChangeType, temp: f32) -> BurnState {
+        if temp > self.config.overheat_threshold {
+            return BurnState::Overheat;
+        }
+
+        match self.state {
+            // Idle can transition only to startup or itself
+            BurnState::Idle => {
+                if temp > self.config.idle_threshold && roc_class == TempChangeType::RisingFast {
+                    BurnState::Startup
+                } else {
+                    BurnState::Idle
+                }
+            }
+
+            // Startup can go to active burn (normal),
+            // coaling (going out),
+            // or remain
+            BurnState::Startup => {
+                if temp > self.config.active_threshold {
+                    BurnState::ActiveBurn
+                } else if roc_class == TempChangeType::Falling {
+                    BurnState::Coaling
+                } else {
+                    BurnState::Startup
+                }
+            }
+
+            // ActiveBurn can go to coaling (dying),
+            // or remain activeBurn (overheat handled above)
+            BurnState::ActiveBurn => {
+                if temp < self.config.active_exit_threshold && roc_class == TempChangeType::Falling
+                {
+                    BurnState::Coaling
+                } else {
+                    BurnState::ActiveBurn
+                }
+            }
+
+            // Coaling can become idle (died),
+            // startup (reloaded),
+            // or stay the same
+            BurnState::Coaling => {
+                if temp < self.config.idle_threshold && roc_class == TempChangeType::Stable {
+                    BurnState::Idle
+                } else if roc_class == TempChangeType::RisingFast {
+                    BurnState::Startup
+                } else {
+                    BurnState::Coaling
+                }
+            }
+
+            // Overheat can decrease to active,
+            // or remain overheat
+            BurnState::Overheat => {
+                if temp < self.config.active_threshold {
+                    BurnState::ActiveBurn
+                } else {
+                    BurnState::Overheat
+                }
+            }
+        }
     }
 }
 
@@ -198,6 +313,29 @@ mod tests {
             actual,
             FLOAT_TOLERANCE,
             variance
+        );
+    }
+
+    #[test]
+    fn remains_idle_under_active_threshold() {
+        let mut sm = StoveStateMachine::new();
+        // set idle
+        sm.state = BurnState::Idle;
+        sm.last_update_time = Instant::now();
+        sm.last_temp = Some(80.0);
+        sm.rate_of_change = Some(5.0 / 60.0); // 5 deg/min
+        sleep(Duration::from_secs(2));
+
+        let threshold = sm.config.idle_threshold;
+        let new_temp = threshold * 0.9;
+
+        sm.update(new_temp);
+
+        assert!(
+            sm.state == BurnState::Idle,
+            "expected {:?}, received {:?}",
+            BurnState::Idle,
+            sm.state
         );
     }
 }
