@@ -194,7 +194,7 @@ impl StoveStateMachine {
             // Overheat can decrease to active,
             // or remain overheat
             BurnState::Overheat => {
-                if temp < self.config.active_threshold {
+                if temp < self.config.overheat_threshold {
                     BurnState::ActiveBurn
                 } else {
                     BurnState::Overheat
@@ -212,6 +212,21 @@ mod tests {
     use std::time::Duration;
 
     const FLOAT_TOLERANCE: f32 = 0.1;
+
+    fn sm_idle(
+        sm: &mut StoveStateMachine,
+        delta: Duration,
+        rate: Option<f32>,
+        last_temp: Option<f32>,
+    ) {
+        let now = Instant::now();
+        let before = now.checked_sub(delta);
+
+        sm.state = BurnState::Idle;
+        sm.last_update_time = before.unwrap();
+        sm.last_temp = last_temp;
+        sm.rate_of_change = rate;
+    }
 
     #[test]
     fn new_state_machine_starts_idle() {
@@ -276,9 +291,7 @@ mod tests {
     #[test]
     fn second_update_sets_correct_roc() {
         let mut sm = StoveStateMachine::new();
-        sm.update(0.0);
-
-        sleep(Duration::from_secs(2));
+        sm_idle(&mut sm, Duration::from_secs(2), None, Some(0.0)); // simulated first update
         sm.update(20.0);
 
         let expected = 20.0 / 2.0;
@@ -296,10 +309,8 @@ mod tests {
     #[test]
     fn third_update_updates_roc() {
         let mut sm = StoveStateMachine::new();
-        sm.update(0.0);
-        sleep(Duration::from_secs(2));
-        sm.update(20.0);
-        sleep(Duration::from_secs(2));
+        sm_idle(&mut sm, Duration::from_secs(2), Some(20.0), Some(0.0));
+
         sm.update(10.0);
 
         let expected_rate = 0.3 * (10.0 / 2.0) + 0.7 * (20.0 / 2.0);
@@ -337,5 +348,84 @@ mod tests {
             BurnState::Idle,
             sm.state
         );
+    }
+
+    #[test]
+    fn transitions_to_startup() {
+        let mut sm = StoveStateMachine::new();
+        sm_idle(
+            &mut sm,
+            Duration::from_secs(2),
+            Some(5.0 / 60.0),
+            Some(64.5),
+        );
+
+        sm.update(215.0);
+
+        assert_eq!(sm.state, BurnState::Startup);
+    }
+
+    #[test]
+    fn transitions_to_burn() {
+        let mut sm = StoveStateMachine::new();
+        sm_idle(
+            &mut sm,
+            Duration::from_secs(20),
+            Some(6.0 / 60.0),
+            Some(300.0),
+        );
+        sm.state = BurnState::Startup;
+
+        sm.update(401.0);
+
+        assert_eq!(sm.state, BurnState::ActiveBurn);
+    }
+
+    #[test]
+    fn transitions_to_overheat() {
+        let mut sm = StoveStateMachine::new();
+        sm_idle(
+            &mut sm,
+            Duration::from_secs(20),
+            Some(6.0 / 60.0),
+            Some(600.0),
+        );
+        sm.state = BurnState::ActiveBurn;
+
+        sm.update(813.45);
+
+        assert_eq!(sm.state, BurnState::Overheat);
+    }
+
+    #[test]
+    fn transitions_back_to_active_burn_from_overheat() {
+        let mut sm = StoveStateMachine::new();
+        sm_idle(
+            &mut sm,
+            Duration::from_secs(20),
+            Some(6.0 / 60.0),
+            Some(813.45),
+        );
+        sm.state = BurnState::Overheat;
+
+        sm.update(589.0);
+
+        assert_eq!(sm.state, BurnState::ActiveBurn);
+    }
+
+    #[test]
+    fn transitions_to_coaling_from_active() {
+        let mut sm = StoveStateMachine::new();
+        sm_idle(
+            &mut sm,
+            Duration::from_secs(20),
+            Some(6.0 / 60.0),
+            Some(401.0),
+        );
+        sm.state = BurnState::ActiveBurn;
+
+        sm.update(320.0);
+
+        assert_eq!(sm.state, BurnState::Coaling);
     }
 }

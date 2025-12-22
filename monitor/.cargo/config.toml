@@ -1,6 +1,5 @@
 [build]
-# target = "riscv32imc-esp-espidf"
-# target = "aarch64-apple-darwin"
+target = "riscv32imc-esp-espidf"
 
 [target.riscv32imc-esp-espidf]
 linker = "ldproxy"

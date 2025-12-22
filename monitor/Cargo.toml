@@ -1,13 +1,11 @@
 [workspace]
-members = [".", "woodstove-logic"]
-# resolver = "2"
+members = ["."]
 
 [package]
 name = "woodstove_monitor"
 version = "0.1.0"
 authors = ["Noah Hood <hood.noah@icloud.com>"]
 edition = "2021"
-# resolver = "2"
 rust-version = "1.77"
 
 [[bin]]
@@ -19,7 +17,10 @@ opt-level = "s"
 
 [profile.dev]
 debug = true    # Symbols are nice, and they don't increase the size on Flash
-opt-level = "z"
+opt-level = 0
+
+[profile.test]
+inherits = "dev"
 
 [features]
 default = []
@@ -29,6 +30,7 @@ experimental = ["esp-idf-svc/experimental"]
 [dependencies]
 log = "0.4"
 esp-idf-svc = "0.51"
+woodstove_lib = { path = "../woodstove_lib" }
 
 # --- Optional Embassy Integration ---
 # esp-idf-svc = { version = "0.51", features = ["critical-section", "embassy-time-driver", "embassy-sync"] }
