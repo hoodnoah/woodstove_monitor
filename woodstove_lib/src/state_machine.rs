@@ -75,7 +75,7 @@ impl StoveStateMachine {
         }
     }
 
-    pub fn update(&mut self, current_temp_f: f32) {
+    pub fn update(&mut self, current_temp_f: f32) -> bool {
         // Update rate of change
         let now = Instant::now();
         let last = self.last_update_time;
@@ -99,6 +99,7 @@ impl StoveStateMachine {
                         self.rate_of_change = Some(new);
                     }
                 }
+                self.last_temp = Some(current_temp_f);
             }
         }
 
@@ -106,7 +107,12 @@ impl StoveStateMachine {
         let rate_type = self.classify_rate();
         let new_state = self.classify_state(rate_type, current_temp_f);
 
-        self.state = new_state;
+        if new_state != self.state {
+            self.state_set_time = Instant::now();
+            self.state = new_state;
+            return true;
+        }
+        return false;
     }
 
     pub fn current_state(&self) -> BurnState {
@@ -118,9 +124,13 @@ impl StoveStateMachine {
     }
 
     pub fn should_reload(&self) -> bool {
-        // TODO: Logic for when reload is needed
-        // Based on state + temperature + time?
-        todo!()
+        match self.state {
+            BurnState::Coaling => {
+                self.last_temp.unwrap_or(0.0) < 300.0
+                    || self.time_in_state() > Duration::from_secs(30 * 60) // 30 mins
+            }
+            _ => false,
+        }
     }
 
     // determines if a given rate of change is rising, stable, falling
@@ -194,7 +204,8 @@ impl StoveStateMachine {
             // Overheat can decrease to active,
             // or remain overheat
             BurnState::Overheat => {
-                if temp < self.config.overheat_threshold {
+                if temp < self.config.active_threshold {
+                    // drop to 400f before recovering
                     BurnState::ActiveBurn
                 } else {
                     BurnState::Overheat
@@ -408,7 +419,7 @@ mod tests {
         );
         sm.state = BurnState::Overheat;
 
-        sm.update(589.0);
+        sm.update(399.0);
 
         assert_eq!(sm.state, BurnState::ActiveBurn);
     }
