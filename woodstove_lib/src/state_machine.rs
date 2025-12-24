@@ -1,27 +1,38 @@
 use std::time::{Duration, Instant};
 
+use crate::{
+    Temperature,
+    temperature::{RateOfChange, TemperatureDelta},
+};
+
 pub struct StoveConfig {
-    pub idle_threshold: f32,
-    pub active_threshold: f32,
-    pub active_exit_threshold: f32,
-    pub overheat_threshold: f32,
+    pub idle_threshold: Temperature,
+    pub active_threshold: Temperature,
+    pub active_exit_threshold: Temperature,
+    pub overheat_threshold: Temperature,
 
     // Rate thresholds
-    pub rising_fast_rate: f32,
-    pub falling_rate: f32,
-    pub stable_rate: f32,
+    pub rising_fast_rate: RateOfChange,
+    pub falling_rate: RateOfChange,
+    pub stable_rate: RateOfChange,
 }
 
 impl Default for StoveConfig {
     fn default() -> Self {
         Self {
-            idle_threshold: 150.0,
-            active_threshold: 400.0,
-            active_exit_threshold: 350.0,
-            overheat_threshold: 700.0,
-            rising_fast_rate: 5.0 / 60.0,
-            falling_rate: -3.0 / 60.0,
-            stable_rate: 1.2 / 60.0,
+            idle_threshold: Temperature::from_fahrenheit(150.0),
+            active_threshold: Temperature::from_fahrenheit(400.0),
+            active_exit_threshold: Temperature::from_fahrenheit(350.0),
+            overheat_threshold: Temperature::from_fahrenheit(700.0),
+            rising_fast_rate: RateOfChange::new_per_minute(
+                TemperatureDelta::from_fahrenheit(5.0),
+                1.0,
+            ),
+            falling_rate: RateOfChange::new_per_minute(
+                TemperatureDelta::from_fahrenheit(-3.0),
+                1.0,
+            ),
+            stable_rate: RateOfChange::new_per_minute(TemperatureDelta::from_fahrenheit(1.2), 1.0),
         }
     }
 }
@@ -47,14 +58,9 @@ pub struct StoveStateMachine {
     state: BurnState,
     state_set_time: Instant,
     last_update_time: Instant,
-    last_temp: Option<f32>,
+    last_temp: Option<Temperature>,
     roc_alpha: f32,
-    rate_of_change: Option<f32>,
-    // TODO: What fields do you need?
-    // - current state
-    // - temperature history for rate-of-change
-    // - when did we enter current state
-    // - configuration thresholds?
+    rate_of_change: Option<RateOfChange>,
 }
 
 impl StoveStateMachine {
@@ -75,7 +81,7 @@ impl StoveStateMachine {
         }
     }
 
-    pub fn update(&mut self, current_temp_f: f32) -> bool {
+    pub fn update(&mut self, current_temp: Temperature) -> bool {
         // Update rate of change
         let now = Instant::now();
         let last = self.last_update_time;
@@ -83,10 +89,13 @@ impl StoveStateMachine {
         match self.last_temp {
             None => {
                 // first update from uninitialized
-                self.last_temp = Some(current_temp_f);
+                self.last_temp = Some(current_temp);
             }
             Some(last_temp) => {
-                let instantaneous = (current_temp_f - last_temp) / (now - last).as_secs_f32();
+                let instantaneous = RateOfChange::new_per_second(
+                    current_temp - last_temp,
+                    (now - last).as_secs_f32(),
+                );
                 match self.rate_of_change {
                     None => {
                         // second update
@@ -99,13 +108,13 @@ impl StoveStateMachine {
                         self.rate_of_change = Some(new);
                     }
                 }
-                self.last_temp = Some(current_temp_f);
+                self.last_temp = Some(current_temp);
             }
         }
 
         // determine new state
         let rate_type = self.classify_rate();
-        let new_state = self.classify_state(rate_type, current_temp_f);
+        let new_state = self.classify_state(rate_type, current_temp);
 
         if new_state != self.state {
             self.state_set_time = Instant::now();
@@ -126,7 +135,8 @@ impl StoveStateMachine {
     pub fn should_reload(&self) -> bool {
         match self.state {
             BurnState::Coaling => {
-                self.last_temp.unwrap_or(0.0) < 300.0
+                self.last_temp.unwrap_or(Temperature::from_fahrenheit(0.0))
+                    < Temperature::from_fahrenheit(300.0)
                     || self.time_in_state() > Duration::from_secs(30 * 60) // 30 mins
             }
             _ => false,
@@ -149,7 +159,7 @@ impl StoveStateMachine {
         }
     }
 
-    fn classify_state(&self, roc_class: TempChangeType, temp: f32) -> BurnState {
+    fn classify_state(&self, roc_class: TempChangeType, temp: Temperature) -> BurnState {
         if temp > self.config.overheat_threshold {
             return BurnState::Overheat;
         }
@@ -219,7 +229,6 @@ impl StoveStateMachine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::thread::sleep;
     use std::time::Duration;
 
     const FLOAT_TOLERANCE: f32 = 0.1;
@@ -227,8 +236,8 @@ mod tests {
     fn sm_idle(
         sm: &mut StoveStateMachine,
         delta: Duration,
-        rate: Option<f32>,
-        last_temp: Option<f32>,
+        rate: Option<RateOfChange>,
+        last_temp: Option<Temperature>,
     ) {
         let now = Instant::now();
         let before = now.checked_sub(delta);
@@ -260,9 +269,9 @@ mod tests {
     #[test]
     fn first_update_sets_updated_time() {
         let mut sm = StoveStateMachine::new();
+        sm_idle(&mut sm, Duration::from_secs(2), None, None);
         let original = sm.last_update_time;
-        sleep(Duration::from_millis(500));
-        sm.update(20.0);
+        sm.update(Temperature::from_fahrenheit(20.0));
 
         assert_ne!(sm.last_update_time, original);
     }
@@ -271,19 +280,18 @@ mod tests {
     fn first_update_sets_temp() {
         let mut sm = StoveStateMachine::new();
         let original = sm.last_temp;
-        sm.update(20.0);
+        sm.update(Temperature::from_fahrenheit(20.0));
 
         assert_ne!(original, sm.last_temp);
-        assert_eq!(sm.last_temp, Some(20.0));
+        assert_eq!(sm.last_temp, Some(Temperature::from_fahrenheit(20.0)));
     }
 
     #[test]
     fn first_update_does_not_set_rate() {
         let mut sm = StoveStateMachine::new();
-        let sleep_time = Duration::from_secs(2);
-        sleep(sleep_time);
+        sm_idle(&mut sm, Duration::from_secs(2), None, None);
 
-        sm.update(20.0);
+        sm.update(Temperature::from_fahrenheit(20.0));
 
         assert!(sm.rate_of_change.is_none());
     }
@@ -291,10 +299,14 @@ mod tests {
     #[test]
     fn second_update_sets_roc() {
         let mut sm = StoveStateMachine::new();
-        sm.update(0.0);
+        sm_idle(
+            &mut sm,
+            Duration::from_secs(2),
+            None,
+            Some(Temperature::from_fahrenheit(0.0)),
+        );
 
-        sleep(Duration::from_secs(2));
-        sm.update(20.0);
+        sm.update(Temperature::from_fahrenheit(20.0));
 
         assert!(sm.rate_of_change.is_some());
     }
@@ -302,17 +314,22 @@ mod tests {
     #[test]
     fn second_update_sets_correct_roc() {
         let mut sm = StoveStateMachine::new();
-        sm_idle(&mut sm, Duration::from_secs(2), None, Some(0.0)); // simulated first update
-        sm.update(20.0);
+        sm_idle(
+            &mut sm,
+            Duration::from_secs(2),
+            None,
+            Some(Temperature::from_fahrenheit(0.0)),
+        ); // simulated first update
+        sm.update(Temperature::from_fahrenheit(20.0));
 
-        let expected = 20.0 / 2.0;
+        let expected = RateOfChange::new_per_second(TemperatureDelta::from_fahrenheit(20.0), 2.0);
         let actual = sm.rate_of_change.unwrap();
-        let variance = (expected - actual).abs();
+        let variance = (expected - actual).fahrenheit_per_second().abs();
         assert!(
             variance < FLOAT_TOLERANCE,
             "Rate of change mismatch: expected {}, got {} (var {})",
-            expected,
-            actual,
+            expected.fahrenheit_per_second(),
+            actual.fahrenheit_per_second(),
             variance,
         )
     }
@@ -320,17 +337,27 @@ mod tests {
     #[test]
     fn third_update_updates_roc() {
         let mut sm = StoveStateMachine::new();
-        sm_idle(&mut sm, Duration::from_secs(2), Some(20.0), Some(0.0));
+        sm_idle(
+            &mut sm,
+            Duration::from_secs(2),
+            Some(RateOfChange::new_per_second(
+                TemperatureDelta::from_fahrenheit(20.0),
+                2.0,
+            )),
+            Some(Temperature::from_fahrenheit(0.0)),
+        );
 
-        sm.update(10.0);
+        sm.update(Temperature::from_fahrenheit(10.0));
 
-        let expected_rate = 0.3 * (10.0 / 2.0) + 0.7 * (20.0 / 2.0);
+        let expected_rate = 0.3
+            * (RateOfChange::new_per_second(TemperatureDelta::from_fahrenheit(10.0), 2.0))
+            + 0.7 * RateOfChange::new_per_second(TemperatureDelta::from_fahrenheit(20.0), 2.0);
         let actual = sm.rate_of_change.unwrap();
-        let variance = expected_rate - actual;
+        let variance = (expected_rate - actual).fahrenheit_per_second();
 
         assert!(
             variance < FLOAT_TOLERANCE,
-            "expected variance between expected_rate ({}) and actual rate ({}) to be less than {}, received {}.",
+            "expected variance between expected_rate ({:?}) and actual rate ({:?}) to be less than {}, received {}.",
             expected_rate,
             actual,
             FLOAT_TOLERANCE,
@@ -342,14 +369,18 @@ mod tests {
     fn remains_idle_under_active_threshold() {
         let mut sm = StoveStateMachine::new();
         // set idle
-        sm.state = BurnState::Idle;
-        sm.last_update_time = Instant::now();
-        sm.last_temp = Some(80.0);
-        sm.rate_of_change = Some(5.0 / 60.0); // 5 deg/min
-        sleep(Duration::from_secs(2));
+        sm_idle(
+            &mut sm,
+            Duration::from_secs(2),
+            Some(RateOfChange::new_per_minute(
+                TemperatureDelta::from_fahrenheit(5.0),
+                1.0,
+            )),
+            Some(Temperature::from_fahrenheit(80.0)),
+        );
 
         let threshold = sm.config.idle_threshold;
-        let new_temp = threshold * 0.9;
+        let new_temp = Temperature::from_fahrenheit(threshold.fahrenheit() * 0.9);
 
         sm.update(new_temp);
 
@@ -367,11 +398,14 @@ mod tests {
         sm_idle(
             &mut sm,
             Duration::from_secs(2),
-            Some(5.0 / 60.0),
-            Some(64.5),
+            Some(RateOfChange::new_per_minute(
+                TemperatureDelta::from_fahrenheit(5.0),
+                1.0,
+            )),
+            Some(Temperature::from_fahrenheit(64.5)),
         );
 
-        sm.update(215.0);
+        sm.update(Temperature::from_fahrenheit(215.0));
 
         assert_eq!(sm.state, BurnState::Startup);
     }
@@ -382,12 +416,15 @@ mod tests {
         sm_idle(
             &mut sm,
             Duration::from_secs(20),
-            Some(6.0 / 60.0),
-            Some(300.0),
+            Some(RateOfChange::new_per_minute(
+                TemperatureDelta::from_fahrenheit(6.0),
+                1.0,
+            )),
+            Some(Temperature::from_fahrenheit(300.0)),
         );
         sm.state = BurnState::Startup;
 
-        sm.update(401.0);
+        sm.update(Temperature::from_fahrenheit(401.0));
 
         assert_eq!(sm.state, BurnState::ActiveBurn);
     }
@@ -398,12 +435,15 @@ mod tests {
         sm_idle(
             &mut sm,
             Duration::from_secs(20),
-            Some(6.0 / 60.0),
-            Some(600.0),
+            Some(RateOfChange::new_per_minute(
+                TemperatureDelta::from_fahrenheit(6.0),
+                1.0,
+            )),
+            Some(Temperature::from_fahrenheit(600.0)),
         );
         sm.state = BurnState::ActiveBurn;
 
-        sm.update(813.45);
+        sm.update(Temperature::from_fahrenheit(813.45));
 
         assert_eq!(sm.state, BurnState::Overheat);
     }
@@ -414,12 +454,15 @@ mod tests {
         sm_idle(
             &mut sm,
             Duration::from_secs(20),
-            Some(6.0 / 60.0),
-            Some(813.45),
+            Some(RateOfChange::new_per_minute(
+                TemperatureDelta::from_fahrenheit(6.0),
+                1.0,
+            )),
+            Some(Temperature::from_fahrenheit(813.45)),
         );
         sm.state = BurnState::Overheat;
 
-        sm.update(399.0);
+        sm.update(Temperature::from_fahrenheit(399.0));
 
         assert_eq!(sm.state, BurnState::ActiveBurn);
     }
@@ -430,12 +473,15 @@ mod tests {
         sm_idle(
             &mut sm,
             Duration::from_secs(20),
-            Some(6.0 / 60.0),
-            Some(401.0),
+            Some(RateOfChange::new_per_minute(
+                TemperatureDelta::from_fahrenheit(6.0),
+                1.0,
+            )),
+            Some(Temperature::from_fahrenheit(401.0)),
         );
         sm.state = BurnState::ActiveBurn;
 
-        sm.update(320.0);
+        sm.update(Temperature::from_fahrenheit(320.0));
 
         assert_eq!(sm.state, BurnState::Coaling);
     }
