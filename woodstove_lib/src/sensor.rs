@@ -1,22 +1,20 @@
-// Trait for abstracting temperature reading
-pub trait TemperatureSensor {
-    type Error;
+use crate::temperature::Temperature;
 
-    fn read_temperature_f(&mut self) -> Result<f32, Self::Error>;
-}
+#[cfg(feature = "max31855")]
+pub mod max31855_sensor {
+    use super::*;
+    use embedded_hal::digital::OutputPin;
+    use max31855::{Max31855, Unit};
 
-// Mock implementation for testing
-pub struct MockSensor {
-    // TODO: How do you want to control mock readings?
-    // - Fixed value?
-    // - Sequence of values?
-    // - Function that returns temp based on time?
-}
-
-impl TemperatureSensor for MockSensor {
-    type Error = ();
-
-    fn read_temperature_f(&mut self) -> Result<f32, Self::Error> {
-        todo!()
+    pub fn read_max31855<SPI, CS, SpiE, CsE>(
+        spi: &mut SPI,
+        cs: &mut CS,
+    ) -> Result<Temperature, max31855::Error<SpiE, CsE>>
+    where
+        SPI: Max31855<SpiE, CsE, CS>,
+        CS: OutputPin<Error = CsE>,
+    {
+        let temp_c = spi.read_thermocouple(cs, Unit::Celsius)?;
+        Ok(Temperature::from_celsius(temp_c))
     }
 }

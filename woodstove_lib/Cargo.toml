@@ -4,4 +4,12 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-max31855 = "0.1.0"
+embedded-hal = "1.0.0"
+
+[features]
+default = ["max31855"]
+max31855 = ["dep:max31855"]
+
+[dependencies.max31855]
+version = "0.1.0"
+optional = true
