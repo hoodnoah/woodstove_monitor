@@ -23,3 +23,6 @@ sdkconfig.old
 # direnv
 .direnv/
 .envrc.local
+
+# env
+.env
