@@ -1,3 +1,5 @@
+mod mqtt;
+
 use esp_idf_svc::{
     eventloop::EspSystemEventLoop,
     hal::{
@@ -10,11 +12,11 @@ use esp_idf_svc::{
         },
         units::*,
     },
-    mqtt::client::*,
     nvs::EspDefaultNvsPartition,
     wifi::{BlockingWifi, ClientConfiguration, Configuration, EspWifi},
 };
 use max31855::{Max31855, Unit};
+use mqtt::WoodstoveMQTT;
 use woodstove_lib::{StoveStateMachine, Temperature};
 
 const WIFI_SSID: &str = env!("WIFI_SSID");
@@ -83,14 +85,8 @@ fn main() -> anyhow::Result<()> {
     FreeRtos::delay_ms(10000); // sleep for 10 seconds to just let everybody chill
     log::info!("wifi connected");
 
-    let mqtt_config = MqttClientConfiguration {
-        client_id: Some("woodstove_monitor"),
-        username: Some(MQTT_USER),
-        password: Some(MQTT_PASS),
-        ..Default::default()
-    };
-
-    let (mut mqtt_client, _) = EspMqttClient::new(MQTT_ENDPOINT, &mqtt_config)?;
+    let mut mqtt_handler =
+        WoodstoveMQTT::new("woodstove_monitor", MQTT_ENDPOINT, MQTT_USER, MQTT_PASS)?;
 
     // setup the state machine
     let mut stove_state_machine = StoveStateMachine::new();
@@ -101,14 +97,8 @@ fn main() -> anyhow::Result<()> {
                 let temp = Temperature::from_celsius(temp_c);
 
                 // publish temperature
-                mqtt_client
-                    .publish(
-                        "woodstove/temperature",
-                        QoS::AtMostOnce,
-                        false,
-                        temp.fahrenheit().to_string().as_bytes(),
-                    )
-                    .ok();
+                mqtt_handler.publish_temperature(&temp)?;
+                log::info!("Published temperature of {}F", temp.fahrenheit());
 
                 // update state machine
                 let state_changed = stove_state_machine.update(temp);
@@ -119,37 +109,17 @@ fn main() -> anyhow::Result<()> {
                     log::info!("State changed to: {}", state_string);
                 }
 
-                mqtt_client
-                    .publish(
-                        "woodstove/state",
-                        QoS::AtLeastOnce,
-                        true,
-                        state_string.as_bytes(),
-                    )
-                    .ok();
+                mqtt_handler.publish_state(stove_state_machine.current_state())?;
 
                 log::info!("Published state as {}", state_string);
 
                 // publish time in state every 6th loop
-                mqtt_client
-                    .publish(
-                        "woodstove/time_in_state",
-                        QoS::AtLeastOnce,
-                        false,
-                        stove_state_machine
-                            .time_in_state()
-                            .as_secs()
-                            .to_string()
-                            .as_bytes(),
-                    )
-                    .ok();
+                mqtt_handler.publish_time_in_state(stove_state_machine.time_in_state())?;
 
                 log::info!("Logged time in state");
 
                 // publish status
-                mqtt_client
-                    .publish("woodstove/status", QoS::AtMostOnce, true, b"online")
-                    .ok();
+                mqtt_handler.publish_status()?;
 
                 status_led.set_low().ok();
 
@@ -157,14 +127,8 @@ fn main() -> anyhow::Result<()> {
             }
             Err(e) => {
                 let error_msg = format!("Sensor error: {:?}", e);
-                mqtt_client
-                    .publish(
-                        "woodstove/error",
-                        QoS::AtLeastOnce,
-                        false,
-                        error_msg.as_bytes(),
-                    )
-                    .ok();
+
+                mqtt_handler.publish_error(error_msg)?;
 
                 status_led.set_high().ok();
 
