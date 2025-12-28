@@ -1,4 +1,7 @@
-use std::time::{Duration, Instant};
+use std::{
+    fmt::Display,
+    time::{Duration, Instant},
+};
 
 use crate::{
     Temperature,
@@ -44,6 +47,18 @@ pub enum BurnState {
     ActiveBurn,
     Coaling,
     Overheat,
+}
+
+impl Display for BurnState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BurnState::Idle => write!(f, "idle"),
+            BurnState::Startup => write!(f, "startup"),
+            BurnState::ActiveBurn => write!(f, "active_burn"),
+            BurnState::Coaling => write!(f, "coaling"),
+            BurnState::Overheat => write!(f, "overheat"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

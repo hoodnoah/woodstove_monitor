@@ -15,7 +15,7 @@ use esp_idf_svc::{
     wifi::{BlockingWifi, ClientConfiguration, Configuration, EspWifi},
 };
 use max31855::{Max31855, Unit};
-use woodstove_lib::{BurnState, StoveStateMachine, Temperature};
+use woodstove_lib::{StoveStateMachine, Temperature};
 
 const WIFI_SSID: &str = env!("WIFI_SSID");
 const WIFI_PASSWORD: &str = env!("WIFI_PASSWORD");
@@ -113,13 +113,7 @@ fn main() -> anyhow::Result<()> {
                 // update state machine
                 let state_changed = stove_state_machine.update(temp);
 
-                let state_string = match stove_state_machine.current_state() {
-                    BurnState::Idle => "idle",
-                    BurnState::Startup => "startup",
-                    BurnState::ActiveBurn => "active_burn",
-                    BurnState::Coaling => "coaling",
-                    BurnState::Overheat => "overheat",
-                };
+                let state_string = stove_state_machine.current_state().to_string();
 
                 if state_changed {
                     log::info!("State changed to: {}", state_string);
