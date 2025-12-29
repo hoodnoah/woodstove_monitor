@@ -1,4 +1,5 @@
 mod mqtt;
+mod wifi;
 
 use esp_idf_svc::{
     eventloop::EspSystemEventLoop,
@@ -65,26 +66,11 @@ fn main() -> anyhow::Result<()> {
     log::info!("SPI and CS configured successfully!");
 
     // Setup wifi
-    let sys_loop = EspSystemEventLoop::take()?;
-    let nvs = EspDefaultNvsPartition::take()?;
-
-    let mut wifi = BlockingWifi::wrap(
-        EspWifi::new(peripherals.modem, sys_loop.clone(), Some(nvs))?,
-        sys_loop.clone(),
-    )?;
-
-    wifi.start()?;
-
-    wifi.set_configuration(&Configuration::Client(ClientConfiguration {
-        ssid: WIFI_SSID.try_into().unwrap(),
-        password: WIFI_PASSWORD.try_into().unwrap(),
-        ..Default::default()
-    }))?;
-
-    wifi.connect()?;
-    FreeRtos::delay_ms(10000); // sleep for 10 seconds to just let everybody chill
+    let mut wifi_handler = wifi::WifiHandler::new(peripherals.modem, WIFI_SSID, WIFI_PASSWORD)?;
+    wifi_handler.connect()?;
     log::info!("wifi connected");
 
+    // Setup mqtt
     let mut mqtt_handler =
         WoodstoveMQTT::new("woodstove_monitor", MQTT_ENDPOINT, MQTT_USER, MQTT_PASS)?;
 
