@@ -13,6 +13,7 @@ pub struct StoveConfig {
     pub active_threshold: Temperature,
     pub active_exit_threshold: Temperature,
     pub overheat_threshold: Temperature,
+    pub overheat_exit_threshold: Temperature,
 
     // Rate thresholds
     pub rising_fast_rate: RateOfChange,
@@ -27,6 +28,7 @@ impl Default for StoveConfig {
             active_threshold: Temperature::from_fahrenheit(400.0),
             active_exit_threshold: Temperature::from_fahrenheit(350.0),
             overheat_threshold: Temperature::from_fahrenheit(700.0),
+            overheat_exit_threshold: Temperature::from_fahrenheit(600.0),
             rising_fast_rate: RateOfChange::new_per_minute(
                 TemperatureDelta::from_fahrenheit(5.0),
                 1.0,
@@ -229,8 +231,8 @@ impl StoveStateMachine {
             // Overheat can decrease to active,
             // or remain overheat
             BurnState::Overheat => {
-                if temp < self.config.active_threshold {
-                    // drop to 400f before recovering
+                if temp < self.config.overheat_exit_threshold {
+                    // drop to 600f before recovering
                     BurnState::ActiveBurn
                 } else {
                     BurnState::Overheat
@@ -470,14 +472,14 @@ mod tests {
             &mut sm,
             Duration::from_secs(20),
             Some(RateOfChange::new_per_minute(
-                TemperatureDelta::from_fahrenheit(6.0),
+                TemperatureDelta::from_fahrenheit(-3.0), // Falling rate
                 1.0,
             )),
             Some(Temperature::from_fahrenheit(813.45)),
         );
         sm.state = BurnState::Overheat;
 
-        sm.update(Temperature::from_fahrenheit(399.0));
+        sm.update(Temperature::from_fahrenheit(599.0)); // Below 600°F exit threshold
 
         assert_eq!(sm.state, BurnState::ActiveBurn);
     }
