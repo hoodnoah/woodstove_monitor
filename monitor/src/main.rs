@@ -14,6 +14,7 @@ use esp_idf_svc::{
         units::*,
     },
     nvs::EspDefaultNvsPartition,
+    sys::EspError,
     wifi::{BlockingWifi, ClientConfiguration, Configuration, EspWifi},
 };
 use max31855::{Max31855, Unit};
@@ -25,6 +26,15 @@ const WIFI_PASSWORD: &str = env!("WIFI_PASSWORD");
 const MQTT_ENDPOINT: &str = env!("MQTT_ENDPOINT");
 const MQTT_USER: &str = env!("MQTT_USER");
 const MQTT_PASS: &str = env!("MQTT_PASS");
+
+const LOOP_DELAY_MS: u32 = 10_000;
+
+fn log_publish_result(name: &str, result: Result<u32, EspError>) {
+    match result {
+        Ok(_) => log::info!("Published {}", name),
+        Err(e) => log::warn!("Failed to publish {}: {:?}", name, e),
+    }
+}
 
 fn main() -> anyhow::Result<()> {
     // It is necessary to call this function once. Otherwise, some patches to the runtime
@@ -83,8 +93,7 @@ fn main() -> anyhow::Result<()> {
                 let temp = Temperature::from_celsius(temp_c);
 
                 // publish temperature
-                mqtt_handler.publish_temperature(&temp)?;
-                log::info!("Published temperature of {}F", temp.fahrenheit());
+                log_publish_result("temperature", mqtt_handler.publish_temperature(&temp));
 
                 // update state machine
                 let state_changed = stove_state_machine.update(temp);
@@ -95,26 +104,28 @@ fn main() -> anyhow::Result<()> {
                     log::info!("State changed to: {}", state_string);
                 }
 
-                mqtt_handler.publish_state(stove_state_machine.current_state())?;
-
-                log::info!("Published state as {}", state_string);
+                log_publish_result(
+                    "state",
+                    mqtt_handler.publish_state(stove_state_machine.current_state()),
+                );
 
                 // publish time in state every 6th loop
-                mqtt_handler.publish_time_in_state(stove_state_machine.time_in_state())?;
-
-                log::info!("Logged time in state");
+                log_publish_result(
+                    "time in state",
+                    mqtt_handler.publish_time_in_state(stove_state_machine.time_in_state()),
+                );
 
                 // publish status
-                mqtt_handler.publish_status()?;
+                log_publish_result("status", mqtt_handler.publish_status());
 
                 status_led.set_low().ok();
-
-                log::info!("Published: {:.1}F", temp.fahrenheit());
             }
             Err(e) => {
                 let error_msg = format!("Sensor error: {:?}", e);
 
-                mqtt_handler.publish_error(error_msg)?;
+                if let Err(mqtt_err) = mqtt_handler.publish_error(error_msg.clone()) {
+                    log::warn!("Failed to publish sensor error: {:?}", mqtt_err);
+                }
 
                 status_led.set_high().ok();
 
@@ -122,6 +133,6 @@ fn main() -> anyhow::Result<()> {
             }
         }
 
-        FreeRtos::delay_ms(10000);
+        FreeRtos::delay_ms(LOOP_DELAY_MS);
     }
 }

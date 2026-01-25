@@ -33,6 +33,9 @@ impl<'a> WifiHandler<'a> {
 
     pub fn connect(&mut self) -> Result<(), EspError> {
         self.wifi.connect()?;
-        Ok(FreeRtos::delay_ms(10000))
+
+        // give the connection a moment
+        FreeRtos::delay_ms(10_000);
+        Ok(())
     }
 }
