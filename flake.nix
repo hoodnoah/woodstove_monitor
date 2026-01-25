@@ -42,6 +42,10 @@
             # Convenience
             just
             cargo-generate
+
+            # nix
+            nil
+            nixd
           ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
             udev
             libusb1
