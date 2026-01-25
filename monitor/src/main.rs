@@ -2,7 +2,6 @@ mod mqtt;
 mod wifi;
 
 use esp_idf_svc::{
-    eventloop::EspSystemEventLoop,
     hal::{
         delay::FreeRtos,
         gpio::*,
@@ -13,9 +12,7 @@ use esp_idf_svc::{
         },
         units::*,
     },
-    nvs::EspDefaultNvsPartition,
     sys::EspError,
-    wifi::{BlockingWifi, ClientConfiguration, Configuration, EspWifi},
 };
 use max31855::{Max31855, Unit};
 use mqtt::WoodstoveMQTT;
