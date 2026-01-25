@@ -18,6 +18,7 @@
           packages = with pkgs; [
             # Rust toolchain manager - espup installs on top of this
             rustup
+            rust-analyzer
 
             # Build deps for esp-idf-sys / bindgen
             pkg-config
@@ -55,7 +56,7 @@
             if [ -f "$HOME/export-esp.sh" ]; then
               source "$HOME/export-esp.sh"
             fi
-            
+
             # Ensure git can use system credential helpers
             export GIT_TERMINAL_PROMPT=1
           '';
