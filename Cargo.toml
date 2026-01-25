@@ -1,0 +1,4 @@
+[workspace]
+members = ["monitor", "woodstove_lib"]
+resolver = "2"
+default-members = ["monitor"]

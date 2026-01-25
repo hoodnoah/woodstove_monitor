@@ -1,5 +1,8 @@
 # ESP32 Rust
 
+LIB_NAME := "woodstove_lib"
+DEV_TARGET := "aarch64-apple-darwin"
+
 default:
     @just --list
 
@@ -14,16 +17,19 @@ new:
     cargo generate esp-rs/esp-idf-template
 
 build:
+    cd monitor && \
     cargo build --release
 
 flash:
+    cd monitor && \
     cargo espflash flash --release --monitor
 
 monitor:
+    cd monitor && \
     cargo espflash monitor
 
 clean:
     cargo clean
 
 test-lib:
-    cargo test -p woodstove_logic --target aarch64-apple-darwin
+    cargo test -p "{{ LIB_NAME }}" --target "{{ DEV_TARGET }}"

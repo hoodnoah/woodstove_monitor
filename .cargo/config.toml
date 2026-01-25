@@ -1,6 +1,6 @@
 [build]
 # target = "riscv32imc-esp-espidf" # devkitM (8684)
-# target = "xtensa-esp32s3-espidf" # arduino nano esp32
+target = "xtensa-esp32s3-espidf" # arduino nano esp32
 # target = "aarch64-apple-darwin" # local
 
 [target.riscv32imc-esp-espidf]

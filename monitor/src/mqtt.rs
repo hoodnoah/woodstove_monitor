@@ -56,7 +56,7 @@ impl<'a> WoodstoveMQTT<'a> {
     pub fn publish_time_in_state(&mut self, time_in_state: Duration) -> Result<u32, EspError> {
         self.client.publish(
             TIME_IN_STATE_TOPIC,
-            QoS::AtLeastOnce,
+            QoS::AtMostOnce,
             false,
             time_in_state.as_secs().to_string().as_bytes(),
         )
@@ -64,11 +64,11 @@ impl<'a> WoodstoveMQTT<'a> {
 
     pub fn publish_status(&mut self) -> Result<u32, EspError> {
         self.client
-            .publish(STATUS_TOPIC, QoS::AtLeastOnce, false, b"online")
+            .publish(STATUS_TOPIC, QoS::AtMostOnce, false, b"online")
     }
 
     pub fn publish_error(&mut self, error_msg: String) -> Result<u32, EspError> {
         self.client
-            .publish(ERROR_TOPIC, QoS::AtLeastOnce, false, error_msg.as_bytes())
+            .publish(ERROR_TOPIC, QoS::AtMostOnce, false, error_msg.as_bytes())
     }
 }

@@ -1,6 +1,3 @@
-[workspace]
-members = ["."]
-
 [package]
 name = "woodstove_monitor"
 version = "0.1.0"
