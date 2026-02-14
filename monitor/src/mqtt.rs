@@ -27,6 +27,8 @@ impl<'a> WoodstoveMQTT<'a> {
             client_id: Some(client_id),
             username: Some(username),
             password: Some(password),
+            keep_alive_interval: Some(Duration::from_secs(30)),
+            reconnect_timeout: Some(Duration::from_secs(5)),
             ..Default::default()
         };
 

@@ -25,6 +25,7 @@ const MQTT_USER: &str = env!("MQTT_USER");
 const MQTT_PASS: &str = env!("MQTT_PASS");
 
 const LOOP_DELAY_MS: u32 = 10_000;
+const WIFI_CHECK_INTERVAL: u32 = 5; // every 5 loops, 50 seconds
 
 fn log_publish_result(name: &str, result: Result<u32, EspError>) {
     match result {
@@ -84,7 +85,28 @@ fn main() -> anyhow::Result<()> {
     // setup the state machine
     let mut stove_state_machine = StoveStateMachine::new();
 
+    let mut wifi_connected = true;
+    let mut loops_since_wifi_check = 0u32;
+
     loop {
+        if loops_since_wifi_check >= WIFI_CHECK_INTERVAL {
+            match wifi_handler.ensure_connected() {
+                Ok(_) => {
+                    if !wifi_connected {
+                        log::info!("WiFi connection restored");
+                        status_led.set_low().ok();
+                    }
+                    wifi_connected = true;
+                }
+                Err(e) => {
+                    log::error!("WiFi check failed: {:?}", e);
+                    wifi_connected = false;
+                    status_led.set_high().ok();
+                }
+            }
+            loops_since_wifi_check = 0;
+        }
+
         match Max31855::read_thermocouple(&mut spi, &mut cs, Unit::Celsius) {
             Ok(temp_c) => {
                 let temp = Temperature::from_celsius(temp_c);
@@ -125,11 +147,11 @@ fn main() -> anyhow::Result<()> {
                 }
 
                 status_led.set_high().ok();
-
                 log::error!("Sensor error: {:?}", e);
             }
         }
 
+        loops_since_wifi_check += 1;
         FreeRtos::delay_ms(LOOP_DELAY_MS);
     }
 }

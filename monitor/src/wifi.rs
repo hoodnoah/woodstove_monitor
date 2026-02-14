@@ -38,4 +38,26 @@ impl<'a> WifiHandler<'a> {
         FreeRtos::delay_ms(10_000);
         Ok(())
     }
+
+    pub fn is_connected(&self) -> Result<bool, EspError> {
+        self.wifi.is_connected()
+    }
+
+    pub fn ensure_connected(&mut self) -> Result<bool, EspError> {
+        if !self.is_connected()? {
+            log::warn!("WiFi disconnected, attempting reconnection...");
+            match self.connect() {
+                Ok(_) => {
+                    log::info!("WiFi reconnected successfully");
+                    Ok(true)
+                }
+                Err(e) => {
+                    log::error!("WiFi reconnection failed: {:?}", e);
+                    Err(e)
+                }
+            }
+        } else {
+            Ok(true)
+        }
+    }
 }
