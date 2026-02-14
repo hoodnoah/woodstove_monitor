@@ -6,12 +6,24 @@ DEV_TARGET := "aarch64-apple-darwin"
 default:
     @just --list
 
+# Check if all required dependencies are installed
+check-deps:
+    @./scripts/check-deps.sh
+
 # One-time setup
 setup:
+    @echo "Installing ESP Rust tooling..."
     cargo install espup
     cargo install cargo-espflash espflash
-    espup install --targets "esp32c2"
-    @echo "Restart shell: exit, then nix develop"
+    espup install --targets "esp32s3"
+    @echo ""
+    @echo "✅ Setup complete!"
+    @echo ""
+    @echo "Next steps:"
+    @echo "  1. Source ESP environment: source ~/export-esp.sh"
+    @echo "  2. Verify dependencies: just check-deps"
+    @echo "  3. Set environment variables (see SETUP.md)"
+    @echo "  4. Build: just build"
 
 new:
     cargo generate esp-rs/esp-idf-template

@@ -32,17 +32,18 @@ A Rust-based temperature monitoring system for woodstoves using an Arduino Nano 
 
 ### Prerequisites
 
-```bash
-# Enter development environment
-nix develop
+See [SETUP.md](SETUP.md) for detailed platform-specific installation instructions.
 
-# One-time: install dev dependencies
-just setup
+**Quick setup:**
 
-# Restart shell to pick up toolchain
-exit
-nix develop
-```
+1. Install system dependencies (cmake, ninja, LLVM, Python 3.12, etc. - see SETUP.md)
+2. Set required environment variables (see SETUP.md)
+3. Install ESP tooling:
+   ```bash
+   just check-deps  # Verify dependencies
+   just setup       # Install ESP tools (one-time)
+   source ~/export-esp.sh  # Load ESP environment
+   ```
 
 ### Configuration
 
