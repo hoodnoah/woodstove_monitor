@@ -35,22 +35,42 @@ If you don't have Rust installed:
 ```bash
 brew install rustup
 rustup-init -y
+```
+
+**For bash/zsh:**
+```bash
 source $HOME/.cargo/env
+```
+
+**For fish:**
+```fish
+set -gx PATH $HOME/.cargo/bin $PATH
 ```
 
 ### 4. Set Environment Variables
 
-Add these to your shell profile (~/.zshrc or ~/.bashrc):
+**For bash/zsh**, add these to your shell profile (~/.zshrc or ~/.bashrc):
 
 ```bash
 export LIBCLANG_PATH="$(brew --prefix llvm)/lib"
 export PKG_CONFIG_PATH="$(brew --prefix openssl)/lib/pkgconfig"
 ```
 
+**For fish**, add these to ~/.config/fish/config.fish:
+
+```fish
+set -gx LIBCLANG_PATH (brew --prefix llvm)/lib
+set -gx PKG_CONFIG_PATH (brew --prefix openssl)/lib/pkgconfig
+```
+
 Then reload your shell:
 
 ```bash
 source ~/.zshrc  # or source ~/.bashrc
+```
+
+```fish
+source ~/.config/fish/config.fish
 ```
 
 ### 5. Install ESP Tooling
@@ -62,6 +82,7 @@ espup install --targets "esp32s3"
 
 ### 6. Load ESP Environment
 
+**For bash/zsh:**
 ```bash
 source ~/export-esp.sh
 ```
@@ -70,6 +91,17 @@ Add this to your shell profile for automatic loading:
 
 ```bash
 echo 'source ~/export-esp.sh' >> ~/.zshrc
+```
+
+**For fish:**
+```fish
+source ~/export-esp.sh
+```
+
+Add this to ~/.config/fish/config.fish for automatic loading:
+
+```fish
+source ~/export-esp.sh
 ```
 
 ### 7. Verify Installation
@@ -116,7 +148,16 @@ If you don't have Rust installed:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+```
+
+**For bash/zsh:**
+```bash
 source $HOME/.cargo/env
+```
+
+**For fish:**
+```fish
+set -gx PATH $HOME/.cargo/bin $PATH
 ```
 
 ### 4. Set Environment Variables
@@ -127,17 +168,28 @@ Find your LLVM version:
 ls /usr/lib/ | grep llvm
 ```
 
-Add to your shell profile (~/.bashrc or ~/.zshrc):
+**For bash/zsh**, add to your shell profile (~/.bashrc or ~/.zshrc):
 
 ```bash
 # Replace '14' with your LLVM version
 export LIBCLANG_PATH=/usr/lib/llvm-14/lib
 ```
 
+**For fish**, add to ~/.config/fish/config.fish:
+
+```fish
+# Replace '14' with your LLVM version
+set -gx LIBCLANG_PATH /usr/lib/llvm-14/lib
+```
+
 Reload your shell:
 
 ```bash
 source ~/.bashrc
+```
+
+```fish
+source ~/.config/fish/config.fish
 ```
 
 ### 5. Configure USB Permissions for ESP32
@@ -166,6 +218,7 @@ espup install --targets "esp32s3"
 
 ### 7. Load ESP Environment
 
+**For bash/zsh:**
 ```bash
 source ~/export-esp.sh
 ```
@@ -174,6 +227,17 @@ Add to your shell profile for automatic loading:
 
 ```bash
 echo 'source ~/export-esp.sh' >> ~/.bashrc
+```
+
+**For fish:**
+```fish
+source ~/export-esp.sh
+```
+
+Add to ~/.config/fish/config.fish for automatic loading:
+
+```fish
+source ~/export-esp.sh
 ```
 
 ### 8. Verify Installation
@@ -191,7 +255,14 @@ just check-deps
 
 Instead of nix develop, source the environment helper:
 
+**For bash/zsh:**
 ```bash
+cd woodstove_monitor
+source env.sh
+```
+
+**For fish:**
+```fish
 cd woodstove_monitor
 source env.sh
 ```
