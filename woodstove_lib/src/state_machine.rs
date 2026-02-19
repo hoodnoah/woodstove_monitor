@@ -80,6 +80,12 @@ pub struct StoveStateMachine {
     rate_of_change: Option<RateOfChange>,
 }
 
+impl Default for StoveStateMachine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl StoveStateMachine {
     pub fn new() -> Self {
         StoveStateMachine::new_roc(None)
@@ -138,7 +144,7 @@ impl StoveStateMachine {
             self.state = new_state;
             return true;
         }
-        return false;
+        false
     }
 
     pub fn current_state(&self) -> BurnState {
