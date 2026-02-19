@@ -1,6 +1,7 @@
 name: Lint woodstove_lib
 
 on:
+  workflow_dispatch:
   pull_request:
     branches:
       - main
