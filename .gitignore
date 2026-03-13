@@ -27,3 +27,5 @@ sdkconfig.old
 # env
 .env
 .zip
+production
+*.zip

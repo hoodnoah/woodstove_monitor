@@ -60,16 +60,16 @@ fn main() -> anyhow::Result<()> {
 
     let mut spi = SpiDeviceDriver::new_single(
         peripherals.spi2,
-        peripherals.pins.gpio48,       // CLK (D13/GPIO48)
-        peripherals.pins.gpio38,       // (dummy, just put one randomly)
-        Some(peripherals.pins.gpio47), // DO (D12/GPIO47)
-        Option::<AnyIOPin>::None,      // handled elsewhere, CS
+        peripherals.pins.gpio1,       // CLK/SCK (GPIO1)
+        peripherals.pins.gpio38,      // (dummy, just put one randomly)
+        Some(peripherals.pins.gpio4), // DO (GPIO4)
+        Option::<AnyIOPin>::None,     // handled elsewhere, CS
         &bus_config,
         &config,
     )
     .unwrap();
 
-    let mut cs = PinDriver::output(peripherals.pins.gpio21).unwrap(); // CS (D10/GPIO21)
+    let mut cs = PinDriver::output(peripherals.pins.gpio3).unwrap(); // CS (GPIO3)
 
     log::info!("SPI and CS configured successfully!");
 
