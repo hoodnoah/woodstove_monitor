@@ -11,9 +11,13 @@ pub struct WifiHandler<'a> {
 }
 
 impl<'a> WifiHandler<'a> {
-    pub fn new(modem: Modem, wifi_ssid: &str, wifi_password: &str) -> Result<Self, EspError> {
+    pub fn new(
+        modem: Modem,
+        wifi_ssid: &str,
+        wifi_password: &str,
+        nvs: EspDefaultNvsPartition,
+    ) -> Result<Self, EspError> {
         let sys_loop = EspSystemEventLoop::take()?;
-        let nvs = EspDefaultNvsPartition::take()?;
 
         let mut wifi = BlockingWifi::wrap(
             EspWifi::new(modem, sys_loop.clone(), Some(nvs))?,

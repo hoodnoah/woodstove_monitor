@@ -1,3 +1,4 @@
+mod config_store;
 mod mqtt;
 mod wifi;
 
@@ -12,6 +13,7 @@ use esp_idf_svc::{
         },
         units::*,
     },
+    nvs::EspDefaultNvsPartition,
     sys::EspError,
 };
 use max31855::{Max31855, Unit};
@@ -70,8 +72,15 @@ fn main() -> anyhow::Result<()> {
 
     log::info!("SPI and CS configured successfully!");
 
-    // Setup wifi
-    let mut wifi_handler = wifi::WifiHandler::new(peripherals.modem, WIFI_SSID, WIFI_PASSWORD)?;
+    // Take the NVS partition once. It's Arc-backed so we can clone it for WiFi.
+    let nvs = EspDefaultNvsPartition::take()?;
+
+    // Load persisted config (falls back to defaults on first boot or parse error)
+    let initial_config = config_store::load_from_nvs(&nvs);
+
+    // Setup wifi (needs the NVS partition for calibration data)
+    let mut wifi_handler =
+        wifi::WifiHandler::new(peripherals.modem, WIFI_SSID, WIFI_PASSWORD, nvs.clone())?;
     wifi_handler.connect()?;
     log::info!("wifi connected");
 
@@ -79,8 +88,11 @@ fn main() -> anyhow::Result<()> {
     let mut mqtt_handler =
         WoodstoveMQTT::new("woodstove_monitor", MQTT_ENDPOINT, MQTT_USER, MQTT_PASS)?;
 
-    // setup the state machine
-    let mut stove_state_machine = StoveStateMachine::new();
+    // Publish the active config on boot so the broker reflects current thresholds
+    log_publish_result("config", mqtt_handler.publish_config(&initial_config));
+
+    // Setup the state machine with the loaded (or default) config
+    let mut stove_state_machine = StoveStateMachine::with_config(initial_config);
 
     let mut wifi_connected = true;
     let mut loops_since_wifi_check = 0u32;
@@ -100,6 +112,22 @@ fn main() -> anyhow::Result<()> {
                 }
             }
             loops_since_wifi_check = 0;
+        }
+
+        // Subscribe after MQTT connects or reconnects (safe to call every iteration)
+        mqtt_handler.subscribe_if_needed();
+
+        // Check for a pending config update received via MQTT
+        if let Some(json) = mqtt_handler.take_config_update() {
+            match config_store::apply_update(stove_state_machine.config(), &json) {
+                Ok(new_config) => {
+                    config_store::save_to_nvs(&nvs, &new_config);
+                    log_publish_result("config", mqtt_handler.publish_config(&new_config));
+                    stove_state_machine.update_config(new_config);
+                    log::info!("Config updated and persisted");
+                }
+                Err(e) => log::warn!("Invalid config update payload: {e:?}"),
+            }
         }
 
         match Max31855::read_thermocouple(&mut spi, &mut cs, Unit::Celsius) {

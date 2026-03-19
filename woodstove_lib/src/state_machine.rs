@@ -8,6 +8,7 @@ use crate::{
     temperature::{RateOfChange, TemperatureDelta},
 };
 
+#[derive(Clone)]
 pub struct StoveConfig {
     pub idle_threshold: Temperature,
     pub active_threshold: Temperature,
@@ -102,6 +103,27 @@ impl StoveStateMachine {
             roc_alpha: roc_alpha.unwrap_or(0.3),
             rate_of_change: None,
         }
+    }
+
+    pub fn with_config(config: StoveConfig) -> Self {
+        let now = Instant::now();
+        StoveStateMachine {
+            config,
+            state: BurnState::Idle,
+            state_set_time: now,
+            last_update_time: now,
+            last_temp: None,
+            roc_alpha: 0.3,
+            rate_of_change: None,
+        }
+    }
+
+    pub fn config(&self) -> &StoveConfig {
+        &self.config
+    }
+
+    pub fn update_config(&mut self, config: StoveConfig) {
+        self.config = config;
     }
 
     pub fn update(&mut self, current_temp: Temperature) -> bool {
