@@ -45,9 +45,6 @@ fn main() -> anyhow::Result<()> {
     // setup SPI for thermocouple reads
     let peripherals = Peripherals::take().unwrap();
 
-    // setup error led
-    let mut status_led = PinDriver::output(peripherals.pins.gpio8)?;
-
     let freq: Hertz = 4.MHz().into();
     let mode = Mode {
         polarity: config::Polarity::IdleLow,
@@ -61,7 +58,7 @@ fn main() -> anyhow::Result<()> {
     let mut spi = SpiDeviceDriver::new_single(
         peripherals.spi2,
         peripherals.pins.gpio1,       // CLK/SCK (GPIO1)
-        peripherals.pins.gpio38,      // (dummy, just put one randomly)
+        peripherals.pins.gpio21,      // (dummy, just put one randomly)
         Some(peripherals.pins.gpio4), // DO (GPIO4)
         Option::<AnyIOPin>::None,     // handled elsewhere, CS
         &bus_config,
@@ -94,14 +91,12 @@ fn main() -> anyhow::Result<()> {
                 Ok(_) => {
                     if !wifi_connected {
                         log::info!("WiFi connection restored");
-                        status_led.set_low().ok();
                     }
                     wifi_connected = true;
                 }
                 Err(e) => {
                     log::error!("WiFi check failed: {:?}", e);
                     wifi_connected = false;
-                    status_led.set_high().ok();
                 }
             }
             loops_since_wifi_check = 0;
@@ -136,8 +131,6 @@ fn main() -> anyhow::Result<()> {
 
                 // publish status
                 log_publish_result("status", mqtt_handler.publish_status());
-
-                status_led.set_low().ok();
             }
             Err(e) => {
                 let error_msg = format!("Sensor error: {:?}", e);
@@ -146,7 +139,6 @@ fn main() -> anyhow::Result<()> {
                     log::warn!("Failed to publish sensor error: {:?}", mqtt_err);
                 }
 
-                status_led.set_high().ok();
                 log::error!("Sensor error: {:?}", e);
             }
         }

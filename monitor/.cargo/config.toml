@@ -1,6 +1,6 @@
 [build]
-# target = "riscv32imc-esp-espidf"
-target = "xtensa-esp32s3-espidf"
+target = "riscv32imc-esp-espidf"
+# target = "xtensa-esp32s3-espidf"
 
 # [target.riscv32imc-esp-espidf]
 # linker = "ldproxy"
@@ -17,8 +17,8 @@ rustflags = ["--cfg", "espidf_time64"]
 build-std = ["std", "panic_abort"]
 
 [env]
-# MCU = "esp32c2"
-MCU = "esp32s3"
+MCU = "esp32c3"
+# MCU = "esp32s3"
 # Note: this variable is not used by the pio builder (`cargo build --features pio`)
 ESP_IDF_VERSION = "v5.3.3"
 PARTITION_TABLE = "partitions.csv"

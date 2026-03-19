@@ -1,6 +1,6 @@
 [build]
-# target = "riscv32imc-esp-espidf" # devkitM (8684)
-target = "xtensa-esp32s3-espidf" # arduino nano esp32
+target = "riscv32imc-esp-espidf" # devkitM (8684)
+# target = "xtensa-esp32s3-espidf" # arduino nano esp32
 # target = "aarch64-apple-darwin" # local
 
 [target.riscv32imc-esp-espidf]
@@ -17,6 +17,7 @@ rustflags = ["--cfg", "espidf_time64"]
 build-std = ["std", "panic_abort"]
 
 [env]
-MCU = "esp32s3"
+# MCU = "esp32s3"
+MCU = "esp32c3"
 # Note: this variable is not used by the pio builder (`cargo build --features pio`)
 ESP_IDF_VERSION = "v5.3.3"
